@@ -29,12 +29,13 @@ async def startup_event():
 async def shutdown_event():
     if db_pool:
         await db_pool.close()
+
+
+# ==========================================
+# SCENARIO 1: The User-First Flow 
+# ==========================================
 @app.get("/users/{user_name}/projects")
 async def get_user_projects(user_name: str):
-    """
-    Checks if a user exists by name, then fetches their assigned projects.
-    Matches the Prisma logic: prisma.user.findFirst({ include: { projectMembers: { include: { project: true } } } })
-    """
     async with db_pool.acquire() as conn:
         # 1. Check if the user exists (Case-insensitive search using ILIKE)
         user_query = 'SELECT id, name FROM "User" WHERE name ILIKE $1 LIMIT 1'
@@ -66,6 +67,11 @@ async def get_user_projects(user_name: str):
                 "message": f"{user['name']} is not assigned to any projects.",
                 "projects": []
             }
+
+
+# ==========================================
+# SCENARIO 2: The Project Roadmap Flow
+# ==========================================
 @app.get("/projects/{project_id}/roadmaps")
 async def get_project_roadmaps(project_id: str):
     """
@@ -77,16 +83,28 @@ async def get_project_roadmaps(project_id: str):
         if not project:
             raise HTTPException(status_code=404, detail="Project not found.")
 
-        # 2. Extract roadmaps
-        roadmap_query = 'SELECT id, title, status, "dueDate" FROM "Roadmap" WHERE "projectId" = $1'
+        # 2. Extract roadmaps (FIXED: We now select ALL columns instead of guessing)
+        roadmap_query = 'SELECT * FROM "Roadmap" WHERE "projectId" = $1'
         roadmaps = await conn.fetch(roadmap_query, project_id)
+
+        # 3. We must convert datetime objects to strings so JSON can read them
+        formatted_roadmaps = []
+        for r in roadmaps:
+            row_dict = dict(r)
+            for key, value in row_dict.items():
+                if hasattr(value, "isoformat"):  # Checks if it's a date/time
+                    row_dict[key] = value.isoformat()
+            formatted_roadmaps.append(row_dict)
 
         return {
             "project_name": project["name"],
-            "total_roadmaps": len(roadmaps),
-            "roadmaps": [dict(r) for r in roadmaps]
+            "total_roadmaps": len(formatted_roadmaps),
+            "roadmaps": formatted_roadmaps
         }
 
+# ==========================================
+# SCENARIO 3: AI Integration (Putting it together)
+# ==========================================
 class ChatRequest(BaseModel):
     user_name: str
     message: str
