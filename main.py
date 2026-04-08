@@ -29,12 +29,6 @@ async def startup_event():
 async def shutdown_event():
     if db_pool:
         await db_pool.close()
-
-
-# ==========================================
-# SCENARIO 1: The User-First Flow 
-# (Translating Adarsh's Prisma 'include' logic)
-# ==========================================
 @app.get("/users/{user_name}/projects")
 async def get_user_projects(user_name: str):
     """
@@ -72,11 +66,6 @@ async def get_user_projects(user_name: str):
                 "message": f"{user['name']} is not assigned to any projects.",
                 "projects": []
             }
-
-
-# ==========================================
-# SCENARIO 2: The Project Roadmap Flow
-# ==========================================
 @app.get("/projects/{project_id}/roadmaps")
 async def get_project_roadmaps(project_id: str):
     """
@@ -98,10 +87,6 @@ async def get_project_roadmaps(project_id: str):
             "roadmaps": [dict(r) for r in roadmaps]
         }
 
-
-# ==========================================
-# SCENARIO 3: AI Integration (Putting it together)
-# ==========================================
 class ChatRequest(BaseModel):
     user_name: str
     message: str
